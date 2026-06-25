@@ -3,16 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventory Scanner</title>
+    <title>Decoupled Inventory Tracker</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
     <style>
+        /* Interactive Scanning Guide Layer styles */
         .scanner-container {
             position: relative;
             overflow: hidden;
-            background-color: #000;
         }
-        /* Custom horizontal red laser line to help guide manual alignments */
         .laser-guide {
             position: absolute;
             top: 50%;
@@ -25,7 +24,6 @@
             transform: translateY(-50%);
             pointer-events: none;
         }
-        /* Style adjustments to make the library's internal video element responsive */
         #reader video {
             width: 100% !important;
             height: 100% !important;
@@ -33,170 +31,256 @@
         }
     </style>
 </head>
-<body class="bg-slate-100 flex items-center justify-center min-h-screen p-4">
-
-    <div class="w-full max-w-md bg-white rounded-3xl shadow-xl p-6 space-y-5 border border-gray-100">
-        
-        <div class="flex items-center justify-center space-x-2">
-            <span class="text-2xl">📦</span>
-            <h1 class="text-2xl font-bold text-blue-600 tracking-wide">Inventory Scanner</h1>
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-4 flex flex-col items-center">
+ 
+    <main class="w-full max-w-lg bg-gray-800 rounded-xl shadow-2xl border border-gray-700 p-6 space-y-6">
+        <h1 class="text-2xl font-bold text-center tracking-wide text-indigo-400">Inventory Sync Core</h1>
+ 
+        <div class="flex bg-gray-900 p-1 rounded-lg border border-gray-700">
+            <button id="togglePurchased" class="flex-1 py-2 text-sm font-medium rounded-md transition-all bg-indigo-600 text-white" onclick="setMode('purchased')">
+                Purchased Mode
+           </button>
+            <button id="toggleReceived" class="flex-1 py-2 text-sm font-medium rounded-md transition-all text-gray-400 hover:text-white" onclick="setMode('received')">
+                Received Mode
+           </button>
         </div>
-
-        <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Operation Mode</label>
-            <select id="operationMode" onchange="handleModeChange(this.value)" class="w-full border border-gray-300 rounded-xl p-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="purchased">1. Purchased Order Mode</option>
-                <option value="received">2. Received Order Mode</option>
-            </select>
-        </div>
-
-        <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-1">Live Camera Viewfinder</label>
-            <div class="scanner-container rounded-xl border border-gray-300 aspect-[4/3]">
+ 
+        <div class="space-y-2">
+            <div class="flex items-center justify-between">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400">Hardware Scanning Engine</label>
+                <button id="btnSwitchCamera" type="button" onclick="switchCamera()" class="hidden text-xs bg-gray-700 hover:bg-gray-600 active:scale-95 text-indigo-400 font-bold py-1 px-2.5 rounded transition-all">
+                    🔄 Switch Camera
+                </button>
+            </div>
+            
+            <div class="scanner-container bg-black rounded-lg aspect-video border-2 border-gray-700">
                 <div id="reader" class="w-full h-full"></div>
                 <div class="laser-guide"></div>
             </div>
             
-            <div class="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-gray-200 mt-2">
-                <span class="text-xs text-gray-500 font-medium">Zoom Scale:</span>
-                <input id="zoomSlider" type="range" min="1" max="4" step="0.1" value="1" class="w-2/3 accent-blue-600 cursor-pointer" oninput="applyZoom(this.value)">
-                <span id="zoomVal" class="text-xs font-bold text-blue-600">1.0x</span>
+            <div class="flex items-center space-x-3 bg-gray-900 p-3 rounded-lg border border-gray-700 mt-2">
+                <span class="text-xs text-gray-400 font-medium">Video Scale (Zoom):</span>
+                <input id="zoomSlider" type="range" min="1" max="5" step="0.1" value="1" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500" oninput="applyZoom(this.value)">
+                <span id="zoomVal" class="text-xs text-indigo-400 font-bold w-8 text-right">1.0x</span>
             </div>
+            <p id="scan-status" class="text-[11px] text-gray-400 text-center italic">Tip: Back away from the object to secure lens focus and adjust the video scale above.</p>
         </div>
-
+ 
         <form id="entryForm" onsubmit="submitTransaction(event)" class="space-y-4">
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Barcode / PO Code Value</label>
-                <input type="text" id="formBarcode" placeholder="Waiting for scan..." required class="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700">
+            <div class="grid grid-cols-2 gap-4">
+               <div>
+                   <label class="block text-xs font-medium text-gray-400 mb-1">PO Code / Scan Target</label>
+                   <input type="text" id="formCode" required class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm focus:outline-none focus:border-indigo-500 text-gray-300">
+               </div>
+               <div>
+                   <label class="block text-xs font-medium text-gray-400 mb-1">1D Barcode Value</label>
+                   <input type="text" id="formBarcode" required class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm focus:outline-none focus:border-indigo-500 text-gray-300">
+               </div>
             </div>
-
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Item Name</label>
-                <input type="text" id="formName" placeholder="e.g. Eye Drop 10ml" required class="w-full border border-gray-300 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700">
+ 
+           <div>
+               <label class="block text-xs font-medium text-gray-400 mb-1">Item Name</label>
+               <input type="text" id="formName" required class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm focus:outline-none focus:border-indigo-500 text-gray-300">
+           </div>
+ 
+            <div class="grid grid-cols-2 gap-4">
+               <div>
+                   <label class="block text-xs font-medium text-gray-400 mb-1">Quantity</label>
+                   <input type="number" id="formQty" min="1" value="1" required class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm focus:outline-none focus:border-indigo-500 text-gray-300">
+               </div>
+               <div>
+                   <label class="block text-xs font-medium text-gray-400 mb-1">Condition Status</label>
+                   <select id="formCondition" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm focus:outline-none focus:border-indigo-500 text-gray-300">
+                       <option value="Good">Good</option>
+                       <option value="Not Good">Not Good</option>
+                   </select>
+               </div>
             </div>
-
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Quantity</label>
-                <input type="number" id="formQty" min="1" value="1" required class="w-full border border-gray-300 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-700">
-            </div>
-
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-1">Condition</label>
-                <select id="formCondition" class="w-full border border-gray-300 rounded-xl p-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="Good">Good</option>
-                    <option value="Not Good">Not Good</option>
-                </select>
-            </div>
-
-            <button type="submit" id="submitBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3.5 px-4 rounded-xl transition-colors shadow-md mt-2">
-                Submit Entry
-            </button>
+ 
+            <button type="submit" id="submitBtn" class="w-full bg-indigo-600 hover:bg-indigo-500 font-semibold text-sm py-3 rounded-lg shadow transition-colors mt-2">
+                Commit Operations Transaction
+           </button>
         </form>
-    </div>
-
+    </main>
+ 
     <script>
-        // ==========================================================
-        // PASTE YOUR EXTRACTED APPS SCRIPT DEPLOYMENT WEB URL HERE
-        // ==========================================================
         const API_URL = "https://script.google.com/macros/s/AKfycbzlVG_onHo_P6AIJqBw093bUxg6U0giH5GmHr18vbFD8e2COel93zgQeRrS-1bglvSwyw/exec";
-
+ 
         let currentMode = 'purchased';
         let html5QrcodeScanner = null;
-        
-        // Software Debounce Settings
+        let activeVideoTrack = null;
+        let availableCameras = [];
+        let currentCameraIndex = 0;
+ 
         let lastScannedBarcode = null;
         let lastScanTimestamp = 0;
-        const DEBOUNCE_THRESHOLD = 2500; // Ignore re-scans for 2.5 seconds
+        const DEBOUNCE_THRESHOLD = 2500; // 2.5 seconds protection barrier
+ 
+        const statusMsg = document.getElementById('scan-status');
 
-        function handleModeChange(value) {
-            currentMode = value;
+        function setMode(mode) {
+            currentMode = mode;
+            const pBtn = document.getElementById('togglePurchased');
+            const rBtn = document.getElementById('toggleReceived');
             const nameInput = document.getElementById('formName');
             
-            if (currentMode === 'purchased') {
+            if(mode === 'purchased') {
+                pBtn.className = "flex-1 py-2 text-sm font-medium rounded-md transition-all bg-indigo-600 text-white";
+                rBtn.className = "flex-1 py-2 text-sm font-medium rounded-md transition-all text-gray-400 hover:text-white";
                 nameInput.disabled = false;
-                nameInput.value = "";
-                nameInput.placeholder = "e.g. Eye Drop 10ml";
-                nameInput.classList.remove('bg-gray-50');
+                nameInput.placeholder = "Enter product name manually";
             } else {
+                rBtn.className = "flex-1 py-2 text-sm font-medium rounded-md transition-all bg-indigo-600 text-white";
+                pBtn.className = "flex-1 py-2 text-sm font-medium rounded-md transition-all text-gray-400 hover:text-white";
                 nameInput.disabled = true;
-                nameInput.value = "";
                 nameInput.placeholder = "Awaiting automated lookup...";
-                nameInput.classList.add('bg-gray-50');
+            }
+            clearForm();
+        }
+ 
+        function initScanner() {
+            try {
+                // Ensure layout elements render immediately
+                setMode('purchased');
+
+                if (typeof Html5Qrcode === 'undefined') {
+                    throw new Error("Scanner engine library failed to compile.");
+                }
+
+                html5QrcodeScanner = new Html5Qrcode("reader");
+                initializeCameraHardware();
+
+            } catch (err) {
+                statusMsg.innerText = "🚨 Engine Error: " + err.message;
+                statusMsg.className = "text-[11px] text-red-400 font-semibold text-center";
             }
         }
 
-        // Camera Engine configured to balance old iOS devices and new high-res Android cameras
-        function startUniversalScanner() {
-            html5QrcodeScanner = new Html5Qrcode("reader");
-            
+        async function initializeCameraHardware() {
+            try {
+                statusMsg.innerText = "📷 Analyzing available hardware lens options...";
+                
+                // Pull hardware tracks profile layout
+                let devices = await Html5Qrcode.getCameras();
+                
+                // If browser permissions block initialization array descriptions, bypass immediately to register access
+                if (!devices || devices.length === 0 || !devices[0].label) {
+                    await executeCameraSession({ facingMode: "environment" });
+                    devices = await Html5Qrcode.getCameras();
+                }
+                
+                if (devices && devices.length > 0) {
+                    availableCameras = devices;
+                    if (availableCameras.length > 1) {
+                        document.getElementById('btnSwitchCamera').classList.remove('hidden');
+                    }
+                    
+                    // Filter targeted rear high-definition units
+                    let backCams = availableCameras.filter(d => 
+                        d.label.toLowerCase().includes('back') || 
+                        d.label.toLowerCase().includes('rear') ||
+                        d.label.toLowerCase().includes('environment')
+                    );
+                    
+                    if (backCams.length > 0) {
+                        // TARGETING MATRICES SELECTION ORDER:
+                        // Force selects the SECOND back camera profile if multiple rear tracks exist 
+                        // to prioritize the crystal clear macro/main auto-focus module.
+                        let prioritizedLens = backCams.length > 1 ? backCams[1] : backCams[0];
+                        currentCameraIndex = availableCameras.findIndex(d => d.id === prioritizedLens.id);
+                    } else {
+                        currentCameraIndex = availableCameras.length > 1 ? 1 : 0;
+                    }
+                    
+                    await executeCameraSession(availableCameras[currentCameraIndex].id);
+                } else {
+                    await executeCameraSession({ facingMode: "environment" });
+                }
+            } catch (err) {
+                console.warn("Hardware mapping array lost, entering environment loop:", err);
+                try {
+                    await executeCameraSession({ facingMode: "environment" });
+                } catch (fallbackErr) {
+                    statusMsg.innerText = "❌ Camera Blocked: Verify permissions or HTTPS parameters.";
+                    statusMsg.className = "text-[11px] text-red-400 font-semibold text-center";
+                }
+            }
+        }
+
+        async function executeCameraSession(cameraConfiguration) {
+            if (html5QrcodeScanner.isScanning) {
+                await html5QrcodeScanner.stop();
+            }
+
             const config = { 
-                fps: 24, 
+                fps: 20, 
                 qrbox: (width, height) => {
-                    // Optimized dimensions focusing specifically on wide 1D barcodes
-                    return { width: Math.floor(width * 0.9), height: Math.floor(height * 0.4) }
+                    return { width: Math.floor(width * 0.85), height: Math.floor(height * 0.4) }
                 },
                 experimentalFeatures: {
                     useBarCodeDetectorIfSupported: true
                 }
             };
 
-            // Constraint Profile 1: Strict Hardware-locked Environment Camera Request
-            const strictConstraints = {
-                videoConstraints: {
-                    facingMode: { exact: "environment" },
-                    width: { min: 1280, ideal: 1920 },
-                    height: { min: 720, ideal: 1080 },
-                    focusMode: "continuous",
-                    advanced: [{ autoFocus: true }]
-                },
-                ...config
-            };
-
-            html5QrcodeScanner.start(
-                { facingMode: { exact: "environment" } }, 
-                strictConstraints,
+            return html5QrcodeScanner.start(
+                cameraConfiguration,
+                config,
                 onScanSuccess
-            ).catch(err => {
-                console.warn("Strict camera mapping failed, entering standard camera fallback path...");
-                
-                // Constraint Profile 2: Soft Fallback for standard environments, cross-device compatibility (Safari/Older Androids)
-                html5QrcodeScanner.start(
-                    { facingMode: "environment" }, 
-                    { fps: 20, qrbox: config.qrbox }, 
-                    onScanSuccess
-                ).catch(finalErr => {
-                    alert("Unable to access any system camera. Please check app permissions.");
-                });
+            ).then(() => {
+                statusMsg.innerText = "Tip: Back away from the object to secure lens focus and adjust the video scale above.";
+                statusMsg.className = "text-[11px] text-gray-400 text-center italic";
+                attachVideoTrack();
             });
         }
 
+        async function switchCamera() {
+            if (!availableCameras || availableCameras.length <= 1) return;
+            
+            currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+            statusMsg.innerText = "🔄 Mapping adjacent hardware stream track...";
+            statusMsg.className = "text-[11px] text-indigo-400 font-medium text-center";
+            
+            try {
+                await executeCameraSession(availableCameras[currentCameraIndex].id);
+            } catch (e) {
+                statusMsg.innerText = "⚠️ Lens selection failed. Dropping to alternative profile...";
+            }
+        }
+ 
+        function attachVideoTrack() {
+            const videoElement = document.querySelector("#reader video");
+            if (videoElement && videoElement.srcObject) {
+                activeVideoTrack = videoElement.srcObject.getVideoTracks()[0];
+            }
+        }
+ 
         function applyZoom(val) {
             document.getElementById('zoomVal').innerText = parseFloat(val).toFixed(1) + 'x';
             const videoElement = document.querySelector("#reader video");
-            if (videoElement) {
+            if(videoElement) {
                 videoElement.style.transform = `scale(${val})`;
             }
         }
-
+ 
         function onScanSuccess(decodedText) {
             const now = Date.now();
             if (decodedText === lastScannedBarcode && (now - lastScanTimestamp) < DEBOUNCE_THRESHOLD) {
-                return; // Suppress duplicate trigger
+                return; 
             }
             
             lastScannedBarcode = decodedText;
             lastScanTimestamp = now;
-
-            // Audio notification response
+ 
             playBeep();
-
+ 
+            document.getElementById('formCode').value = decodedText;
             document.getElementById('formBarcode').value = decodedText;
-
+ 
             if (currentMode === 'received') {
                 executeBackendLookup(decodedText);
             }
         }
-
+ 
         async function executeBackendLookup(barcode) {
             const nameInput = document.getElementById('formName');
             nameInput.value = "Searching Database...";
@@ -205,7 +289,7 @@
                 const response = await fetch(`${API_URL}?action=lookup&barcode=${encodeURIComponent(barcode)}`);
                 const result = await response.json();
                 
-                if (result.status === "success") {
+                if(result.status === "success") {
                     nameInput.value = result.data.itemName;
                 } else {
                     nameInput.value = "";
@@ -213,73 +297,68 @@
                 }
             } catch(e) {
                 nameInput.value = "";
-                alert("Network communication handling error.");
+                alert("Network communication timeout handling lookup verification.");
             }
         }
-
+ 
         async function submitTransaction(e) {
             e.preventDefault();
             const submitBtn = document.getElementById('submitBtn');
             submitBtn.disabled = true;
-            submitBtn.innerText = "Submitting...";
-
+            submitBtn.innerText = "Transmitting to Google Cloud Engine...";
+ 
             const payload = {
                 mode: currentMode,
                 data: {
-                    code: document.getElementById('formBarcode').value, // Matches Code field requirements
+                    code: document.getElementById('formCode').value,
                     barcode: document.getElementById('formBarcode').value,
                     name: document.getElementById('formName').value,
                     qty: document.getElementById('formQty').value,
                     condition: document.getElementById('formCondition').value
                 }
             };
-
+ 
             try {
                 await fetch(API_URL, {
                     method: 'POST',
-                    mode: 'no-cors',
+                    mode: 'no-cors', 
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
                 
-                alert("Entry updated successfully!");
+                alert("Operation submitted safely to cloud records stack.");
                 clearForm();
             } catch(err) {
-                alert("Error sending transaction payload.");
+                alert("Error writing database transaction framework record.");
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.innerText = "Submit Entry";
+                submitBtn.innerText = "Commit Operations Transaction";
             }
         }
-
+ 
         function clearForm() {
+            document.getElementById('formCode').value = "";
             document.getElementById('formBarcode').value = "";
             document.getElementById('formName').value = "";
             document.getElementById('formQty').value = "1";
             document.getElementById('formCondition').value = "Good";
             lastScannedBarcode = null;
-            if (currentMode === 'received') {
-                document.getElementById('formName').placeholder = "Awaiting automated lookup...";
-            }
         }
-
+ 
         function playBeep() {
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.type = "sine";
-                osc.frequency.setValueAtTime(880, ctx.currentTime);
-                gain.gain.setValueAtTime(0.05, ctx.currentTime);
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.start();
-                osc.stop(ctx.currentTime + 0.1);
-            } catch(e) { console.log("Audio play blocked by browser interaction rules"); }
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(880, ctx.currentTime); 
+            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.12);
         }
-
-        // Initialize camera routines once page DOM structures settle
-        window.addEventListener('DOMContentLoaded', startUniversalScanner);
+ 
+        window.addEventListener('DOMContentLoaded', initScanner);
     </script>
 </body>
 </html>
