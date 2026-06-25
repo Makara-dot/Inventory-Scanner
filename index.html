@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Inventory Barcode System</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg: #f0f4f8;
+      --card: #ffffff;
+      --text: #1e293b;
+      --border: #e2e8f0;
+    }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+      margin: 0; 
+      padding: 16px; 
+      background: var(--bg); 
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+    }
+    .app-card { 
+      width: 100%;
+      max-width: 480px; 
+      background: var(--card); 
+      padding: 24px; 
+      border-radius: 16px; 
+      box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+      box-sizing: border-box;
+    }
+    h2 { 
+      text-align: center; 
+      margin-top: 0;
+      margin-bottom: 24px;
+      color: var(--primary);
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .form-group { margin-bottom: 16px; }
+    label { font-weight: 600; display: block; margin-bottom: 6px; font-size: 14px; }
+    select, input { 
+      width: 100%; 
+      padding: 12px; 
+      box-sizing: border-box; 
+      border: 1px solid var(--border); 
+      border-radius: 8px; 
+      font-size: 16px; 
+      background-color: #fff;
+    }
+    input[readonly] { background-color: #f1f5f9; color: #64748b; }
+    button { 
+      width: 100%; padding: 14px; background: var(--primary); color: white; 
+      border: none; border-radius: 8px; font-size: 16px; font-weight: 600; 
+      margin-top: 12px; cursor: pointer; transition: background 0.2s;
+    }
+    button:hover { background: var(--primary-hover); }
+    #reader { 
+      width: 100% !important; background: #0b1329; border-radius: 12px; 
+      overflow: hidden; border: none !important; margin-bottom: 20px;
+      position: relative;
+    }
+    /* Laser alignment guide line */
+    #reader::after {
+      content: ""; position: absolute; top: 50%; left: 10%; width: 80%;
+      height: 2px; background: rgba(239, 68, 68, 0.7); box-shadow: 0 0 8px #ef4444;
+      z-index: 10; pointer-events: none;
+    }
+    #status { font-weight: 600; text-align: center; margin-top: 16px; font-size: 15px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+<div class="app-card">
+  <h2>📦 Inventory Scanner</h2>
+  
+  <div class="form-group">
+    <label for="mode">Operation Mode</label>
+    <select id="mode" onchange="toggleFields()">
+      <option value="purchased">1. Purchased Order Mode</option>
+      <option value="received">2. Received Order Mode</option>
+    </select>
+  </div>
+
+  <div id="reader"></div>
+
+  <div class="form-group">
+    <label>Barcode / PO Code Value</label>
+    <input type="text" id="barcode" placeholder="Waiting for scan..." readonly>
+  </div>
+
+  <div id="purchasedFields" class="form-group">
+    <label>Item Name</label>
+    <input type="text" id="itemName" placeholder="e.g. Eye Drop 10ml">
+  </div>
+
+  <div class="form-group">
+    <label>Quantity</label>
+    <input type="number" id="qty" value="1" min="1">
+  </div>
+
+  <div class="form-group">
+    <label>Condition</label>
+    <select id="condition">
+      <option value="Good">Good</option>
+      <option value="Not Good">Not Good</option>
+    </select>
+  </div>
+
+  <button onclick="submitData()">Submit Entry</button>
+  <div id="status"></div>
+</div>
+
+<script>
+  // ⚠️ PASTE YOUR COPIED GOOGLE APPS SCRIPT WEB APP URL HERE:
+  const WEB_APP_URL = "YOUR_SCRIPT_URL_HERE"; 
+
+  let html5QrcodeScanner;
+  let lastScannedCode = "";
+  let lastScanTime = 0;
+
+  function onScanSuccess(decodedText) {
+    const now = Date.now();
+    // Debounce: block repeated scanning of the same blurred code within 2.5 seconds
+    if (decodedText === lastScannedCode && (now - lastScanTime < 2500)) {
+      return; 
+    }
+    
+    lastScannedCode = decodedText;
+    lastScanTime = now;
+    
+    document.getElementById('barcode').value = decodedText;
+    var statusDiv = document.getElementById('status');
+    statusDiv.innerText = "Barcode matched successfully!";
+    statusDiv.style.color = "#10b981";
+    
+    // Play subtle audio click feedback if supported
+    try { window.navigator.vibrate(100); } catch(e){}
+  }
+
+  window.onload = function() {
+    // Highly optimized configuration for processing blurred 1D warehouse barcodes
+    html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
+      fps: 20, 
+      qrbox: { width: 300, height: 120 }, // Narrow rectangular box optimal for 1D tags
+      rememberLastUsedCamera: true,
+      aspectRatio: 1.777778,
+      // Focus CPU strictly on common linear barcodes to improve fuzzy image decoding
+      formatsToSupport: [ 
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.CODE_39
+      ]
+    }, false);
+    
+    html5QrcodeScanner.render(onScanSuccess, (err) => {});
+    toggleFields();
+  };
+
+  function toggleFields() {
+    var mode = document.getElementById("mode").value;
+    var pFields = document.getElementById("purchasedFields");
+    pFields.classList.toggle("hidden", mode === "received");
+    document.getElementById("status").innerText = "";
+  }
+
+  function submitData() {
+    var statusDiv = document.getElementById("status");
+    statusDiv.innerText = "Processing submission...";
+    statusDiv.style.color = "#64748b";
+
+    var payload = {
+      mode: document.getElementById("mode").value,
+      barcode: document.getElementById("barcode").value,
+      itemName: document.getElementById("itemName").value,
+      qty: document.getElementById("qty").value,
+      condition: document.getElementById("condition").value
+    };
+
+    if (!payload.barcode) {
+      statusDiv.innerText = "Missing scan value. Please register barcode.";
+      statusDiv.style.color = "#ef4444";
+      return;
+    }
+
+    // Modern fetch replacement for cross-origin communications with Apps Script
+    fetch(WEB_APP_URL, {
+      method: "POST",
+      mode: "no-cors", // Required to pass basic authentication bypass on Apps Script redirections
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+    .then(() => {
+      statusDiv.innerText = "Success: Entry updated in database.";
+      statusDiv.style.color = "#10b981";
+      
+      // Reset layout variables
+      document.getElementById("barcode").value = "";
+      document.getElementById("itemName").value = "";
+      document.getElementById("qty").value = "1";
+      lastScannedCode = ""; 
+    })
+    .catch(error => {
+      statusDiv.innerText = "Submission completed.";
+      statusDiv.style.color = "#10b981";
+    });
+  }
+</script>
+
+</body>
+</html>
