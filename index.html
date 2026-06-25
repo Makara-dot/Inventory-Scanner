@@ -58,20 +58,25 @@
       margin-top: 12px; cursor: pointer; transition: background 0.2s;
     }
     button:hover { background: var(--primary-hover); }
+    
     #reader { 
       width: 100% !important; background: #0b1329; border-radius: 12px; 
       overflow: hidden; border: none !important; margin-bottom: 20px;
       position: relative;
-      min-height: 250px;
     }
+    
+    /* Simulate a digital hardware zoom by upscaling the video container visually */
     #reader video {
       object-fit: cover !important;
       width: 100% !important;
+      transform: scale(1.25); /* Slight digital zoom forces user to back away for clean focus */
+      transform-origin: center;
     }
-    /* Laser alignment guide line */
+    
+    /* High-visibility Laser alignment guide line */
     #reader::after {
-      content: ""; position: absolute; top: 50%; left: 10%; width: 80%;
-      height: 2px; background: rgba(239, 68, 68, 0.7); box-shadow: 0 0 8px #ef4444;
+      content: ""; position: absolute; top: 50%; left: 5%; width: 90%;
+      height: 3px; background: #ff0055; box-shadow: 0 0 10px #ff0055;
       z-index: 10; pointer-events: none;
     }
     #status { font-weight: 600; text-align: center; margin-top: 16px; font-size: 15px; }
@@ -146,14 +151,19 @@
   }
 
   window.onload = function() {
-    // Instantiate programmatic scanner
     html5QrCode = new Html5Qrcode("reader");
 
-    // HD Quality Constraints + Strict Back Camera Enforcement
+    // Widened bounding box so barcodes don't have to get physically close to the camera lens
     const cameraConfig = {
-      fps: 20,
-      qrbox: { width: 320, height: 140 }, // Linear rectangle focus area
-      aspectRatio: 1.777778, // Crisp 16:9 widescreen canvas mapping
+      fps: 24, // Higher sample pool rate
+      qrbox: function(viewfinderWidth, viewfinderHeight) {
+        // Dynamic horizontal calculation targeting barcodes further back in the frame
+        return {
+          width: Math.floor(viewfinderWidth * 0.85), 
+          height: Math.floor(viewfinderHeight * 0.4)
+        };
+      },
+      aspectRatio: 1.333333, // 4:3 ratio provides deeper depth-of-field over 16:9 widescreen
       formatsToSupport: [
         Html5QrcodeSupportedFormats.EAN_13,
         Html5QrcodeSupportedFormats.CODE_128,
@@ -163,25 +173,30 @@
       ]
     };
 
+    // Configuration prioritizing crystal clear depth over wide framing
     const videoConstraints = {
-      facingMode: { exact: "environment" }, // Forces environment back-camera on phones
-      width: { ideal: 1920 }, // Requests Full HD clarity
-      height: { ideal: 1080 }
+      facingMode: { exact: "environment" },
+      width: { ideal: 1280, min: 640 },
+      height: { ideal: 960, min: 480 }
     };
 
-    // Fallback if desktop doesn't have an environment flag
-    html5QrCode.start({ facingMode: "environment" }, cameraConfig, onScanSuccess)
+    html5QrCode.start(videoConstraints, cameraConfig, onScanSuccess)
       .then(() => {
-        // Enforce Macro Continuous Autofocus after camera engine safely launches
+        // Push advanced camera focus modes after stream activates
         setTimeout(() => {
-          html5QrCode.applyVideoConstraints({
-            focusMode: "continuous",
-            advanced: [{ shortcut: true }]
-          }).catch(e => console.log("Continuous Autofocus injection managed by hardware."));
-        }, 2000);
+          const track = html5QrCode.getRunningTrack();
+          if (track && typeof track.applyConstraints === "function") {
+            track.applyConstraints({
+              advanced: [
+                { focusMode: "continuous" },
+                { focusDistance: 0.2 } // Direct advice to browser hardware for close-up scanning configurations
+              ]
+            }).catch(e => console.log("Focus manipulation bypassed by hardware native handler."));
+          }
+        }, 1500);
       })
       .catch(err => {
-        // Desktop fallback: If strict "environment" fails, use default available camera
+        // Desktop fallback mechanism
         html5QrCode.start({ facingMode: "user" }, cameraConfig, onScanSuccess);
       });
 
