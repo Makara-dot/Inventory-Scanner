@@ -62,6 +62,11 @@
       width: 100% !important; background: #0b1329; border-radius: 12px; 
       overflow: hidden; border: none !important; margin-bottom: 20px;
       position: relative;
+      min-height: 250px;
+    }
+    #reader video {
+      object-fit: cover !important;
+      width: 100% !important;
     }
     /* Laser alignment guide line */
     #reader::after {
@@ -119,13 +124,12 @@
   // ⚠️ PASTE YOUR COPIED GOOGLE APPS SCRIPT WEB APP URL HERE:
   const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzlVG_onHo_P6AIJqBw093bUxg6U0giH5GmHr18vbFD8e2COel93zgQeRrS-1bglvSwyw/exec"; 
 
-  let html5QrcodeScanner;
+  let html5QrCode;
   let lastScannedCode = "";
   let lastScanTime = 0;
 
   function onScanSuccess(decodedText) {
     const now = Date.now();
-    // Debounce: block repeated scanning of the same blurred code within 2.5 seconds
     if (decodedText === lastScannedCode && (now - lastScanTime < 2500)) {
       return; 
     }
@@ -138,28 +142,49 @@
     statusDiv.innerText = "Barcode matched successfully!";
     statusDiv.style.color = "#10b981";
     
-    // Play subtle audio click feedback if supported
     try { window.navigator.vibrate(100); } catch(e){}
   }
 
   window.onload = function() {
-    // Highly optimized configuration for processing blurred 1D warehouse barcodes
-    html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
-      fps: 20, 
-      qrbox: { width: 300, height: 120 }, // Narrow rectangular box optimal for 1D tags
-      rememberLastUsedCamera: true,
-      aspectRatio: 1.777778,
-      // Focus CPU strictly on common linear barcodes to improve fuzzy image decoding
-      formatsToSupport: [ 
+    // Instantiate programmatic scanner
+    html5QrCode = new Html5Qrcode("reader");
+
+    // HD Quality Constraints + Strict Back Camera Enforcement
+    const cameraConfig = {
+      fps: 20,
+      qrbox: { width: 320, height: 140 }, // Linear rectangle focus area
+      aspectRatio: 1.777778, // Crisp 16:9 widescreen canvas mapping
+      formatsToSupport: [
         Html5QrcodeSupportedFormats.EAN_13,
         Html5QrcodeSupportedFormats.CODE_128,
         Html5QrcodeSupportedFormats.UPC_A,
         Html5QrcodeSupportedFormats.EAN_8,
         Html5QrcodeSupportedFormats.CODE_39
       ]
-    }, false);
-    
-    html5QrcodeScanner.render(onScanSuccess, (err) => {});
+    };
+
+    const videoConstraints = {
+      facingMode: { exact: "environment" }, // Forces environment back-camera on phones
+      width: { ideal: 1920 }, // Requests Full HD clarity
+      height: { ideal: 1080 }
+    };
+
+    // Fallback if desktop doesn't have an environment flag
+    html5QrCode.start({ facingMode: "environment" }, cameraConfig, onScanSuccess)
+      .then(() => {
+        // Enforce Macro Continuous Autofocus after camera engine safely launches
+        setTimeout(() => {
+          html5QrCode.applyVideoConstraints({
+            focusMode: "continuous",
+            advanced: [{ shortcut: true }]
+          }).catch(e => console.log("Continuous Autofocus injection managed by hardware."));
+        }, 2000);
+      })
+      .catch(err => {
+        // Desktop fallback: If strict "environment" fails, use default available camera
+        html5QrCode.start({ facingMode: "user" }, cameraConfig, onScanSuccess);
+      });
+
     toggleFields();
   };
 
@@ -189,10 +214,9 @@
       return;
     }
 
-    // Modern fetch replacement for cross-origin communications with Apps Script
     fetch(WEB_APP_URL, {
       method: "POST",
-      mode: "no-cors", // Required to pass basic authentication bypass on Apps Script redirections
+      mode: "no-cors",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     })
@@ -200,7 +224,6 @@
       statusDiv.innerText = "Success: Entry updated in database.";
       statusDiv.style.color = "#10b981";
       
-      // Reset layout variables
       document.getElementById("barcode").value = "";
       document.getElementById("itemName").value = "";
       document.getElementById("qty").value = "1";
