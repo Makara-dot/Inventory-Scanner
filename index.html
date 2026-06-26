@@ -1,189 +1,364 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <base target="_top">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg-color: #0d0e12;
-      --card-bg: #161820;
-      --accent: #d4af37; /* Luxury Gold */
-      --accent-hover: #bfa030;
-      --text: #f3f4f6;
-      --text-muted: #9ca3af;
-      --border: #242736;
-      --success: #10b981;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
-    body { background-color: var(--bg-color); color: var(--text); padding: 40px 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-    .container { width: 100%; max-width: 480px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 32px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
-    .header { margin-bottom: 28px; text-align: center; }
-    .header h1 { font-size: 24px; font-weight: 500; letter-spacing: -0.5px; margin-bottom: 6px; color: var(--text); }
-    .header p { color: var(--text-muted); font-size: 14px; }
-    
-    .mode-selector { display: flex; gap: 12px; margin-bottom: 24px; background: rgba(255,255,255,0.03); padding: 6px; border-radius: 10px; border: 1px solid var(--border); }
-    .mode-btn { flex: 1; padding: 10px; background: transparent; border: none; color: var(--text-muted); border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 14px; transition: all 0.2s ease; }
-    .mode-btn.active { background: var(--accent); color: #000; font-weight: 600; }
-    
-    .form-group { margin-bottom: 20px; position: relative; }
-    .form-group label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 8px; font-weight: 600; }
-    .form-group input, .form-group select { width: 100%; padding: 14px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 8px; color: #fff; font-size: 15px; transition: border-color 0.2s ease; }
-    .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--accent); }
-    
-    /* Live Item Banner Display */
-    .item-preview-banner { background: rgba(212, 175, 55, 0.08); border-left: 3px solid var(--accent); padding: 12px 16px; border-radius: 4px; margin-bottom: 20px; display: none; }
-    .item-preview-banner p { font-size: 13px; color: var(--text-muted); }
-    .item-preview-banner h2 { font-size: 18px; color: var(--accent); font-weight: 500; margin-top: 2px; }
-
-    .submit-btn { width: 100%; padding: 14px; background: var(--accent); border: none; border-radius: 8px; color: #000; font-weight: 600; font-size: 16px; cursor: pointer; margin-top: 10px; transition: background 0.2s ease; }
-    .submit-btn:hover { background: var(--accent-hover); }
-    
-    .notification { margin-top: 16px; padding: 12px; border-radius: 6px; text-align: center; font-size: 14px; display: none; }
-    .notification.success { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid var(--success); }
-    .notification.error { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid #ef4444; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Decoupled Inventory Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        /* Interactive Scanning Guide Layer styles */
+        .scanner-container {
+            position: relative;
+            overflow: hidden;
+        }
+        .laser-guide {
+            position: absolute;
+            top: 50%;
+            left: 5%;
+            width: 90%;
+            height: 2px;
+            background-color: #ef4444;
+            box-shadow: 0 0 8px #ef4444;
+            z-index: 10;
+            transform: translateY(-50%);
+            pointer-events: none;
+        }
+        #reader video {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
+        }
+    </style>
 </head>
-<body>
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-4 flex flex-col items-center">
+ 
+    <main class="w-full max-w-lg bg-gray-800 rounded-xl shadow-2xl border border-gray-700 p-6 space-y-6">
+        <h1 class="text-2xl font-bold text-center tracking-wide text-indigo-400">Smart Barcode Scanner</h1>
+ 
+        <div class="flex bg-gray-900 p-1 rounded-lg border border-gray-700">
+            <button id="togglePurchased" class="flex-1 py-2 text-sm font-medium rounded-md transition-all bg-indigo-600 text-white" onclick="setMode('purchased')">
+                Purchased Mode
+           </button>
+            <button id="toggleReceived" class="flex-1 py-2 text-sm font-medium rounded-md transition-all text-gray-400 hover:text-white" onclick="setMode('received')">
+                Received Mode
+           </button>
+        </div>
+ 
+        <div class="space-y-2">
+            <div class="flex items-center justify-between">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400">Hardware Scanning Engine</label>
+                <button id="btnSwitchCamera" type="button" onclick="switchCamera()" class="hidden text-xs bg-gray-700 hover:bg-gray-600 active:scale-95 text-indigo-400 font-bold py-1 px-2.5 rounded transition-all">
+                    🔄 Switch Camera
+                </button>
+            </div>
+            
+            <div class="scanner-container bg-black rounded-lg aspect-video border-2 border-gray-700">
+                <div id="reader" class="w-full h-full"></div>
+                <div class="laser-guide"></div>
+            </div>
+            
+            <div class="flex items-center space-x-3 bg-gray-900 p-3 rounded-lg border border-gray-700 mt-2">
+                <span class="text-xs text-gray-400 font-medium">Video Scale (Zoom):</span>
+                <input id="zoomSlider" type="range" min="1" max="5" step="0.1" value="1" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-500" oninput="applyZoom(this.value)">
+                <span id="zoomVal" class="text-xs text-indigo-400 font-bold w-8 text-right">1.0x</span>
+            </div>
+            <p id="scan-status" class="text-[11px] text-gray-400 text-center italic">Tip: Back away from the object to secure lens focus and adjust the video scale above.</p>
+        </div>
+ 
+        <form id="entryForm" onsubmit="submitTransaction(event)" class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+               <div>
+                   <label class="block text-xs font-medium text-gray-400 mb-1">PO Code / Scan Target</label>
+                   <input type="text" id="formCode" required class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm focus:outline-none focus:border-indigo-500 text-gray-300">
+               </div>
+               <div>
+                   <label class="block text-xs font-medium text-gray-400 mb-1">1D Barcode Value</label>
+                   <input type="text" id="formBarcode" required class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm focus:outline-none focus:border-indigo-500 text-gray-300">
+               </div>
+            </div>
+ 
+           <div>
+               <label class="block text-xs font-medium text-gray-400 mb-1">Item Name</label>
+               <input type="text" id="formName" required class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm focus:outline-none focus:border-indigo-500 text-gray-300">
+           </div>
+ 
+            <div class="grid grid-cols-2 gap-4">
+               <div>
+                   <label class="block text-xs font-medium text-gray-400 mb-1">Quantity</label>
+                   <input type="number" id="formQty" min="1" value="1" required class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm focus:outline-none focus:border-indigo-500 text-gray-300">
+               </div>
+               <div>
+                   <label class="block text-xs font-medium text-gray-400 mb-1">Condition Status</label>
+                   <select id="formCondition" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm focus:outline-none focus:border-indigo-500 text-gray-300">
+                       <option value="Good">Good</option>
+                       <option value="Not Good">Not Good</option>
+                   </select>
+               </div>
+            </div>
+ 
+            <button type="submit" id="submitBtn" class="w-full bg-indigo-600 hover:bg-indigo-500 font-semibold text-sm py-3 rounded-lg shadow transition-colors mt-2">
+                Commit Operations Transaction
+           </button>
+        </form>
+    </main>
+ 
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycbxGkyyPku1JwB9Xqm05L-M1mgFhPyaMoNwRTj7_Kcp4Y_ZQ1Sra3yYSmZ-2RBdfqedaAw/exec";
+ 
+        let currentMode = 'purchased';
+        let html5QrcodeScanner = null;
+        let activeVideoTrack = null;
+        let availableCameras = [];
+        let currentCameraIndex = 0;
+ 
+        let lastScannedBarcode = null;
+        let lastScanTimestamp = 0;
+        const DEBOUNCE_THRESHOLD = 2500; // 2.5 seconds protection barrier
+ 
+        const statusMsg = document.getElementById('scan-status');
 
-<div class="container">
-  <div class="header">
-    <h1>Lux Inventory Portal</h1>
-    <p>Premium Real-Time Supply Chain Ledger</p>
-  </div>
+        function setMode(mode) {
+            currentMode = mode;
+            const pBtn = document.getElementById('togglePurchased');
+            const rBtn = document.getElementById('toggleReceived');
+            const nameInput = document.getElementById('formName');
+            
+            if(mode === 'purchased') {
+                pBtn.className = "flex-1 py-2 text-sm font-medium rounded-md transition-all bg-indigo-600 text-white";
+                rBtn.className = "flex-1 py-2 text-sm font-medium rounded-md transition-all text-gray-400 hover:text-white";
+                nameInput.disabled = false;
+                nameInput.placeholder = "Enter product name manually";
+            } else {
+                rBtn.className = "flex-1 py-2 text-sm font-medium rounded-md transition-all bg-indigo-600 text-white";
+                pBtn.className = "flex-1 py-2 text-sm font-medium rounded-md transition-all text-gray-400 hover:text-white";
+                nameInput.disabled = true;
+                nameInput.placeholder = "Awaiting automated lookup...";
+            }
+            clearForm();
+        }
+ 
+        function initScanner() {
+            try {
+                // Ensure layout elements render immediately
+                setMode('purchased');
 
-  <div class="mode-selector">
-    <button class="mode-btn active" id="btn-purchased" onclick="setMode('purchased')">Purchased Mode</button>
-    <button class="mode-btn" id="btn-received" onclick="setMode('received')">Received Mode</button>
-  </div>
+                if (typeof Html5Qrcode === 'undefined') {
+                    throw new Error("Scanner engine library failed to compile.");
+                }
 
-  <div class="form-group">
-    <label>Barcode ID</label>
-    <input type="text" id="barcode" placeholder="Scan or type barcode..." autocomplete="off" oninput="liveLookupItem(this.value)">
-  </div>
+                html5QrcodeScanner = new Html5Qrcode("reader");
+                initializeCameraHardware();
 
-  <div class="item-preview-banner" id="preview-banner">
-    <p>Identified Catalog Item</p>
-    <h2 id="preview-name">Loading...</h2>
-  </div>
+            } catch (err) {
+                statusMsg.innerText = "🚨 Engine Error: " + err.message;
+                statusMsg.className = "text-[11px] text-red-400 font-semibold text-center";
+            }
+        }
 
-  <div class="form-group">
-    <label>Item Manual Name</label>
-    <input type="text" id="item-name" placeholder="Item descriptive name">
-  </div>
+        async function initializeCameraHardware() {
+            try {
+                statusMsg.innerText = "📷 Analyzing available hardware lens options...";
+                
+                // Pull hardware tracks profile layout
+                let devices = await Html5Qrcode.getCameras();
+                
+                // If browser permissions block initialization array descriptions, bypass immediately to register access
+                if (!devices || devices.length === 0 || !devices[0].label) {
+                    await executeCameraSession({ facingMode: "environment" });
+                    devices = await Html5Qrcode.getCameras();
+                }
+                
+                if (devices && devices.length > 0) {
+                    availableCameras = devices;
+                    if (availableCameras.length > 1) {
+                        document.getElementById('btnSwitchCamera').classList.remove('hidden');
+                    }
+                    
+                    // Filter targeted rear high-definition units
+                    let backCams = availableCameras.filter(d => 
+                        d.label.toLowerCase().includes('back') || 
+                        d.label.toLowerCase().includes('rear') ||
+                        d.label.toLowerCase().includes('environment')
+                    );
+                    
+                    if (backCams.length > 0) {
+                        // TARGETING MATRICES SELECTION ORDER:
+                        // Force selects the SECOND back camera profile if multiple rear tracks exist 
+                        // to prioritize the crystal clear macro/main auto-focus module.
+                        let prioritizedLens = backCams.length > 1 ? backCams[1] : backCams[0];
+                        currentCameraIndex = availableCameras.findIndex(d => d.id === prioritizedLens.id);
+                    } else {
+                        currentCameraIndex = availableCameras.length > 1 ? 1 : 0;
+                    }
+                    
+                    await executeCameraSession(availableCameras[currentCameraIndex].id);
+                } else {
+                    await executeCameraSession({ facingMode: "environment" });
+                }
+            } catch (err) {
+                console.warn("Hardware mapping array lost, entering environment loop:", err);
+                try {
+                    await executeCameraSession({ facingMode: "environment" });
+                } catch (fallbackErr) {
+                    statusMsg.innerText = "❌ Camera Blocked: Verify permissions or HTTPS parameters.";
+                    statusMsg.className = "text-[11px] text-red-400 font-semibold text-center";
+                }
+            }
+        }
 
-  <div class="form-group">
-    <label>Quantity</label>
-    <input type="number" id="qty" value="1" min="1">
-  </div>
+        async function executeCameraSession(cameraConfiguration) {
+            if (html5QrcodeScanner.isScanning) {
+                await html5QrcodeScanner.stop();
+            }
 
-  <div class="form-group">
-    <label>Tracking Condition</label>
-    <select id="condition">
-      <option value="Good">Good Condition</option>
-      <option value="Damaged">Damaged</option>
-    </select>
-  </div>
+            const config = { 
+                fps: 20, 
+                qrbox: (width, height) => {
+                    return { width: Math.floor(width * 0.85), height: Math.floor(height * 0.4) }
+                },
+                experimentalFeatures: {
+                    useBarCodeDetectorIfSupported: true
+                }
+            };
 
-  <button class="submit-btn" onclick="submitData()">Commit Transaction</button>
-  <div class="notification" id="toast"></div>
-</div>
+            return html5QrcodeScanner.start(
+                cameraConfiguration,
+                config,
+                onScanSuccess
+            ).then(() => {
+                statusMsg.innerText = "Tip: Back away from the object to secure lens focus and adjust the video scale above.";
+                statusMsg.className = "text-[11px] text-gray-400 text-center italic";
+                attachVideoTrack();
+            });
+        }
 
-<script>
-  let activeMode = 'purchased';
-  let lookupTimeout = null;
-  
-  // YOUR APPSCRIPT WEB URL INTEGRATED HERE
-  const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxGkyyPku1JwB9Xqm05L-M1mgFhPyaMoNwRTj7_Kcp4Y_ZQ1Sra3yYSmZ-2RBdfqedaAw/exec";
-
-  function setMode(mode) {
-    activeMode = mode;
-    document.getElementById('btn-purchased').classList.toggle('active', mode === 'purchased');
-    document.getElementById('btn-received').classList.toggle('active', mode === 'received');
-    showNotification('', false);
-  }
-
-  // Live Lookups instantly before submitting data using your AppScript URL
-  function liveLookupItem(barcode) {
-    clearTimeout(lookupTimeout);
-    const banner = document.getElementById('preview-banner');
-    const nameField = document.getElementById('item-name');
-    
-    if (!barcode.trim()) {
-      banner.style.display = 'none';
-      return;
-    }
-
-    lookupTimeout = setTimeout(() => {
-      // Direct call using the explicit Web App URL endpoint
-      fetch(`${WEB_APP_URL}?action=lookup&barcode=${encodeURIComponent(barcode)}`)
-        .then(response => response.json())
-        .then(res => {
-          if (res.status === "success") {
-            banner.style.display = 'block';
-            document.getElementById('preview-name').innerText = res.data.itemName;
-            nameField.value = res.data.itemName; 
-          } else {
-            banner.style.display = 'none';
-          }
-        })
-        .catch(err => {
-          console.log("Fallback to native environment connection...");
-          // Fallback to internal container routing if fetch experiences CORS flags
-          if (typeof google !== 'undefined') {
-            google.script.run.withSuccessHandler((responseJSON) => {
-              const innerRes = JSON.parse(responseJSON);
-              if (innerRes.status === "success") {
-                banner.style.display = 'block';
-                document.getElementById('preview-name').innerText = innerRes.data.itemName;
-                nameField.value = innerRes.data.itemName;
-              }
-            }).doGet({ parameter: { action: 'lookup', barcode: barcode } });
-          }
-        });
-    }, 300); 
-  }
-
-  function submitData() {
-    const data = {
-      code: document.getElementById('barcode').value, 
-      barcode: document.getElementById('barcode').value,
-      name: document.getElementById('item-name').value,
-      qty: document.getElementById('qty').value,
-      condition: document.getElementById('condition').value
-    };
-
-    if (!data.barcode || !data.name) {
-      showNotification('Please fill in barcode and item name properties.', true);
-      return;
-    }
-
-    // Commits data securely using internal container triggers
-    if (typeof google !== 'undefined') {
-      google.script.run.withSuccessHandler((responseStatus) => {
-        showNotification('Transaction logged cleanly into spreadsheet ledger!', false);
-        document.getElementById('barcode').value = '';
-        document.getElementById('item-name').value = '';
-        document.getElementById('qty').value = '1';
-        document.getElementById('preview-banner').style.display = 'none';
-      }).processTransaction(activeMode, data);
-    } else {
-      // Fallback alternative endpoint handling via POST requests
-      fetch(WEB_APP_URL, {
-        method: 'POST',
-        body: JSON.stringify({ mode: activeMode, data: data })
-      }).then(() => {
-        showNotification('Transaction logged cleanly into spreadsheet ledger!', false);
-      });
-    }
-  }
-
-  function showNotification(msg, isError) {
-    const toast = document.getElementById('toast');
-    if (!msg) { toast.style.display = 'none'; return; }
-    toast.style.display = 'block';
-    toast.className = 'notification ' + (isError ? 'error' : 'success');
-    toast.innerText = msg;
-  }
-</script>
+        async function switchCamera() {
+            if (!availableCameras || availableCameras.length <= 1) return;
+            
+            currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+            statusMsg.innerText = "🔄 Mapping adjacent hardware stream track...";
+            statusMsg.className = "text-[11px] text-indigo-400 font-medium text-center";
+            
+            try {
+                await executeCameraSession(availableCameras[currentCameraIndex].id);
+            } catch (e) {
+                statusMsg.innerText = "⚠️ Lens selection failed. Dropping to alternative profile...";
+            }
+        }
+ 
+        function attachVideoTrack() {
+            const videoElement = document.querySelector("#reader video");
+            if (videoElement && videoElement.srcObject) {
+                activeVideoTrack = videoElement.srcObject.getVideoTracks()[0];
+            }
+        }
+ 
+        function applyZoom(val) {
+            document.getElementById('zoomVal').innerText = parseFloat(val).toFixed(1) + 'x';
+            const videoElement = document.querySelector("#reader video");
+            if(videoElement) {
+                videoElement.style.transform = `scale(${val})`;
+            }
+        }
+ 
+        function onScanSuccess(decodedText) {
+            const now = Date.now();
+            if (decodedText === lastScannedBarcode && (now - lastScanTimestamp) < DEBOUNCE_THRESHOLD) {
+                return; 
+            }
+            
+            lastScannedBarcode = decodedText;
+            lastScanTimestamp = now;
+ 
+            playBeep();
+ 
+            document.getElementById('formCode').value = decodedText;
+            document.getElementById('formBarcode').value = decodedText;
+ 
+            if (currentMode === 'received') {
+                executeBackendLookup(decodedText);
+            }
+        }
+ 
+        async function executeBackendLookup(barcode) {
+            const nameInput = document.getElementById('formName');
+            nameInput.value = "Searching Database...";
+            
+            try {
+                const response = await fetch(`${API_URL}?action=lookup&barcode=${encodeURIComponent(barcode)}`);
+                const result = await response.json();
+                
+                if(result.status === "success") {
+                    nameInput.value = result.data.itemName;
+                } else {
+                    nameInput.value = "";
+                    alert("System cross-reference lookup failed: Product record missing.");
+                }
+            } catch(e) {
+                nameInput.value = "";
+                alert("Network communication timeout handling lookup verification.");
+            }
+        }
+ 
+        async function submitTransaction(e) {
+            e.preventDefault();
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerText = "Transmitting to Google Cloud Engine...";
+ 
+            const payload = {
+                mode: currentMode,
+                data: {
+                    code: document.getElementById('formCode').value,
+                    barcode: document.getElementById('formBarcode').value,
+                    name: document.getElementById('formName').value,
+                    qty: document.getElementById('formQty').value,
+                    condition: document.getElementById('formCondition').value
+                }
+            };
+ 
+            try {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                alert("Operation submitted safely to cloud records stack.");
+                clearForm();
+            } catch(err) {
+                alert("Error writing database transaction framework record.");
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Commit Operations Transaction";
+            }
+        }
+ 
+        function clearForm() {
+            document.getElementById('formCode').value = "";
+            document.getElementById('formBarcode').value = "";
+            document.getElementById('formName').value = "";
+            document.getElementById('formQty').value = "1";
+            document.getElementById('formCondition').value = "Good";
+            lastScannedBarcode = null;
+        }
+ 
+        function playBeep() {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(880, ctx.currentTime); 
+            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.12);
+        }
+ 
+        window.addEventListener('DOMContentLoaded', initScanner);
+    </script>
 </body>
 </html>
